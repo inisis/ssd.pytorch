@@ -104,7 +104,30 @@ You can specify the parameters listed in the `eval.py` file by flagging them or 
 
 | Original | Converted weiliu89 weights | From scratch w/o data aug | From scratch w/ data aug |
 |:-:|:-:|:-:|:-:|
-| 77.2 % | 77.26 % | 58.12% | 77.43 % |
+| 77.2 % | 77.26 % | 58.12% | 77.72 % |
+
+##### Evaluation report for the current version
+AP for aeroplane = 0.8104<br />
+AP for bicycle = 0.8517<br />
+AP for bird = 0.7638<br />
+AP for boat = 0.7127<br />
+AP for bottle = 0.5173<br />
+AP for bus = 0.8563<br />
+AP for car = 0.8665<br />
+AP for cat = 0.8817<br />
+AP for chair = 0.6077<br />
+AP for cow = 0.8295<br />
+AP for diningtable = 0.7713<br />
+AP for dog = 0.8572<br />
+AP for horse = 0.8645<br />
+AP for motorbike = 0.8501<br />
+AP for person = 0.7876<br />
+AP for pottedplant = 0.5205<br />
+AP for sheep = 0.7692<br />
+AP for sofa = 0.8091<br />
+AP for train = 0.8608<br />
+AP for tvmonitor = 0.7559<br />
+Mean AP = 0.7772<br />
 
 ##### FPS
 **GTX 1060:** ~45.45 FPS
@@ -168,6 +191,6 @@ We have accumulated the following to-do list, which we hope to complete in the n
 ## References
 - Wei Liu, et al. "SSD: Single Shot MultiBox Detector." [ECCV2016]((http://arxiv.org/abs/1512.02325)).
 - [Original Implementation (CAFFE)](https://github.com/weiliu89/caffe/tree/ssd)
-- A huge thank you to [Alex Koltun](https://github.com/alexkoltun) and his team at [Webyclip](http://www.webyclip.com) for their help in finishing the data augmentation portion.
+- A huge thank you to [Alex Koltun](https://github.com/alexkoltun) and his team at [Webyclip](webyclip.com) for their help in finishing the data augmentation portion.
 - A list of other great SSD ports that were sources of inspiration (especially the Chainer repo):
   * [Chainer](https://github.com/Hakuyume/chainer-ssd), [Keras](https://github.com/rykov8/ssd_keras), [MXNet](https://github.com/zhreshold/mxnet-ssd), [Tensorflow](https://github.com/balancap/SSD-Tensorflow)

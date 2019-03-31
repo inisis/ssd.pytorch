@@ -160,9 +160,13 @@ def train():
         if iteration in cfg['lr_steps']:
             step_index += 1
             adjust_learning_rate(optimizer, args.gamma, step_index)
-
-        # load train data
-        images, targets = next(batch_iterator)
+        
+        try:
+            # load train data
+            images, targets = next(batch_iterator)
+        except StopIteration:
+            batch_iterator = iter(data_loader)
+            images, targets = next(batch_iterator)
 
         if args.cuda:
             images = Variable(images.cuda())
@@ -185,8 +189,8 @@ def train():
 
         if iteration % 10 == 0:
             print('timer: %.4f sec.' % (t1 - t0))
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
-
+            # print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]) '|| Loc Loss: %.4f ||' % (loc_loss.data[0]) || 'Conf Loss: %.4f ||' % (conf_loss.data[0]), end=' ')
+            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.item())+ 'Loc Loss: %.4f ||' % (loss_l.item()) + ' || Conf Loss: %.4f ||' % (loss_c.item()), end= ' ')
         if args.visdom:
             update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
                             iter_plot, epoch_plot, 'append')
