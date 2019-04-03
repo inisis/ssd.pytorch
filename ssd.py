@@ -31,17 +31,39 @@ class SSD(nn.Module):
         self.num_classes = num_classes
         self.cfg = (coco, voc)[num_classes == 21]
         self.priorbox = PriorBox(self.cfg)
-        self.priors = Variable(self.priorbox.forward(), volatile=True)
+        self.priors = Variable(self.priorbox.forward())
         self.size = size
 
         # SSD network
-        self.vgg = nn.ModuleList(base)
+        self.vgg_front = nn.Sequential(*list(base[:23]))
+        self.vgg_back = nn.Sequential(*list(base[23:]))
         # Layer learns to scale the l2 normalized features from conv4_3
         self.L2Norm = L2Norm(512, 20)
-        self.extras = nn.ModuleList(extras)
+        self.extra1 = nn.Sequential(*list(extras[0:2]))
+        self.extra2 = nn.Sequential(*list(extras[2:4]))
+        self.extra3 = nn.Sequential(*list(extras[4:6]))
+        self.extra4 = nn.Sequential(*list(extras[6:8]))
+        self.extra5 = nn.Sequential(*list(extras[8:10]))
+        self.extra6 = nn.Sequential(*list(extras[10:12]))
+        self.extra7 = nn.Sequential(*list(extras[12:14]))
+        self.extra8 = nn.Sequential(*list(extras[14:16]))
 
-        self.loc = nn.ModuleList(head[0])
-        self.conf = nn.ModuleList(head[1])
+        self.conf_conv1 = nn.Conv2d(512, 84, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conf_conv2 = nn.Conv2d(1024, 126, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conf_conv3 = nn.Conv2d(512, 126, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conf_conv4 = nn.Conv2d(256, 126, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conf_conv5 = nn.Conv2d(256, 84, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conf_conv6 = nn.Conv2d(256, 84, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+
+        self.loc_conv1 = nn.Conv2d(512, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.loc_conv2 = nn.Conv2d(1024, 24, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.loc_conv3 = nn.Conv2d(512, 24, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.loc_conv4 = nn.Conv2d(256, 24, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.loc_conv5 = nn.Conv2d(256, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.loc_conv6 = nn.Conv2d(256, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+
+        # self.loc = nn.Sequential(*list(head[0]))
+        # self.conf = nn.Sequential(*list(head[1]))
 
         if phase == 'test':
             self.softmax = nn.Softmax(dim=-1)
@@ -71,30 +93,68 @@ class SSD(nn.Module):
         conf = list()
 
         # apply vgg up to conv4_3 relu
-        for k in range(23):
-            x = self.vgg[k](x)
+        x = self.vgg_front(x)
 
         s = self.L2Norm(x)
+
         sources.append(s)
 
         # apply vgg up to fc7
-        for k in range(23, len(self.vgg)):
-            x = self.vgg[k](x)
+
+        x = self.vgg_back(x)
+
         sources.append(x)
 
         # apply extra layers and cache source layer outputs
-        for k, v in enumerate(self.extras):
-            x = F.relu(v(x), inplace=True)
-            if k % 2 == 1:
-                sources.append(x)
+        # for k, v in enumerate(self.extras):
+        #     x = F.relu(v(x), inplace=True)
+        #     if k % 2 == 1:
+        #         sources.append(x)
+
+        x = self.extra1(x)
+        x = self.extra2(x)
+        sources.append(x)
+
+        x = self.extra3(x)
+        x = self.extra4(x)
+        sources.append(x)
+
+        x = self.extra5(x)
+        x = self.extra6(x)
+        sources.append(x)
+
+        x = self.extra7(x)
+        x = self.extra8(x)
+        sources.append(x)
 
         # apply multibox head to source layers
-        for (x, l, c) in zip(sources, self.loc, self.conf):
-            loc.append(l(x).permute(0, 2, 3, 1).contiguous())
-            conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+        # for (x, l, c) in zip(sources, self.loc, self.conf):
+        #     loc.append(l(x).permute(0, 2, 3, 1).contiguous())
+        #     conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+
+        loc.append(self.loc_conv1(sources[0]).permute(0, 2, 3, 1).contiguous())
+        conf.append(self.conf_conv1(sources[0]).permute(0, 2, 3, 1).contiguous())
+
+        loc.append(self.loc_conv2(sources[1]).permute(0, 2, 3, 1).contiguous())
+        conf.append(self.conf_conv2(sources[1]).permute(0, 2, 3, 1).contiguous())
+
+        loc.append(self.loc_conv3(sources[2]).permute(0, 2, 3, 1).contiguous())
+        conf.append(self.conf_conv3(sources[2]).permute(0, 2, 3, 1).contiguous())
+
+        loc.append(self.loc_conv4(sources[3]).permute(0, 2, 3, 1).contiguous())
+        conf.append(self.conf_conv4(sources[3]).permute(0, 2, 3, 1).contiguous())
+
+        loc.append(self.loc_conv5(sources[4]).permute(0, 2, 3, 1).contiguous())
+        conf.append(self.conf_conv5(sources[4]).permute(0, 2, 3, 1).contiguous())
+
+        loc.append(self.loc_conv6(sources[5]).permute(0, 2, 3, 1).contiguous())
+        conf.append(self.conf_conv6(sources[5]).permute(0, 2, 3, 1).contiguous())
 
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
+
+        # return loc, conf
+
         if self.phase == "test":
             output = self.detect(
                 loc.view(loc.size(0), -1, 4),                   # loc preds
@@ -116,7 +176,7 @@ class SSD(nn.Module):
             print('Loading weights into state dict...')
             self.load_state_dict(torch.load(base_file,
                                  map_location=lambda storage, loc: storage))
-            print('Finished!')
+            print('Load weights finished!')
         else:
             print('Sorry only .pth and .pkl files supported.')
 
@@ -156,8 +216,10 @@ def add_extras(cfg, i, batch_norm=False):
             if v == 'S':
                 layers += [nn.Conv2d(in_channels, cfg[k + 1],
                            kernel_size=(1, 3)[flag], stride=2, padding=1)]
+                layers += [nn.ReLU(inplace=True)]
             else:
                 layers += [nn.Conv2d(in_channels, v, kernel_size=(1, 3)[flag])]
+                layers += [nn.ReLU(inplace=True)]
             flag = not flag
         in_channels = v
     return layers
@@ -172,7 +234,7 @@ def multibox(vgg, extra_layers, cfg, num_classes):
                                  cfg[k] * 4, kernel_size=3, padding=1)]
         conf_layers += [nn.Conv2d(vgg[v].out_channels,
                         cfg[k] * num_classes, kernel_size=3, padding=1)]
-    for k, v in enumerate(extra_layers[1::2], 2):
+    for k, v in enumerate(extra_layers[2::4], 2):
         loc_layers += [nn.Conv2d(v.out_channels, cfg[k]
                                  * 4, kernel_size=3, padding=1)]
         conf_layers += [nn.Conv2d(v.out_channels, cfg[k]

@@ -5,6 +5,7 @@ from ssd import build_ssd
 import os
 import sys
 import time
+import collections
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -90,6 +91,7 @@ def train():
 
     if args.visdom:
         import visdom
+        global viz
         viz = visdom.Visdom()
 
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
@@ -105,7 +107,35 @@ def train():
     else:
         vgg_weights = torch.load(args.save_folder + args.basenet)
         print('Loading base network...')
-        ssd_net.vgg.load_state_dict(vgg_weights)
+
+        # front
+        model_dict = ssd_net.vgg_front.state_dict()
+        # 1. filter out unnecessary keys
+        pretrained_dict = {k: v for k, v in vgg_weights.items() if k in model_dict}
+        # 2. overwrite entries in the existing state dict
+        model_dict.update(pretrained_dict)
+        # 3. load the new state dict
+        ssd_net.vgg_front.load_state_dict(pretrained_dict)
+
+        # back
+        model_dict = ssd_net.vgg_back.state_dict()
+
+        key_dict = collections.OrderedDict()
+        for k, v in vgg_weights.items():
+            k_split = k.split(".")
+            k_new = str(int(k_split[0]) - 23) + '.' + k_split[1]
+            key_dict[k] = k_new
+
+        for k, v in key_dict.items():
+            if k in vgg_weights:
+                vgg_weights[v] = vgg_weights.pop(k)
+
+        # 1. filter out unnecessary keys
+        pretrained_dict = {k: v for k, v in vgg_weights.items() if k in model_dict}
+        # 2. overwrite entries in the existing state dict
+        model_dict.update(pretrained_dict)
+        # 3. load the new state dict
+        ssd_net.vgg_back.load_state_dict(pretrained_dict)
 
     if args.cuda:
         net = net.cuda()
@@ -113,9 +143,28 @@ def train():
     if not args.resume:
         print('Initializing weights...')
         # initialize newly added layers' weights with xavier method
-        ssd_net.extras.apply(weights_init)
-        ssd_net.loc.apply(weights_init)
-        ssd_net.conf.apply(weights_init)
+        ssd_net.extra1.apply(weights_init)
+        ssd_net.extra2.apply(weights_init)
+        ssd_net.extra3.apply(weights_init)
+        ssd_net.extra4.apply(weights_init)
+        ssd_net.extra5.apply(weights_init)
+        ssd_net.extra6.apply(weights_init)
+        ssd_net.extra7.apply(weights_init)
+        ssd_net.extra8.apply(weights_init)
+
+        ssd_net.loc_conv1.apply(weights_init)
+        ssd_net.loc_conv2.apply(weights_init)
+        ssd_net.loc_conv3.apply(weights_init)
+        ssd_net.loc_conv4.apply(weights_init)
+        ssd_net.loc_conv5.apply(weights_init)
+        ssd_net.loc_conv6.apply(weights_init)
+
+        ssd_net.conf_conv1.apply(weights_init)
+        ssd_net.conf_conv2.apply(weights_init)
+        ssd_net.conf_conv3.apply(weights_init)
+        ssd_net.conf_conv4.apply(weights_init)
+        ssd_net.conf_conv5.apply(weights_init)
+        ssd_net.conf_conv6.apply(weights_init)
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum,
                           weight_decay=args.weight_decay)
@@ -170,10 +219,10 @@ def train():
 
         if args.cuda:
             images = Variable(images.cuda())
-            targets = [Variable(ann.cuda(), volatile=True) for ann in targets]
+            targets = [Variable(ann.cuda()) for ann in targets]
         else:
             images = Variable(images)
-            targets = [Variable(ann, volatile=True) for ann in targets]
+            targets = [Variable(ann) for ann in targets]
         # forward
         t0 = time.time()
         out = net(images)
@@ -184,16 +233,15 @@ def train():
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        loc_loss += loss_l.item()
+        conf_loss += loss_c.item()
 
         if iteration % 10 == 0:
-            print('timer: %.4f sec.' % (t1 - t0))
             # print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]) '|| Loc Loss: %.4f ||' % (loc_loss.data[0]) || 'Conf Loss: %.4f ||' % (conf_loss.data[0]), end=' ')
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.item())+ 'Loc Loss: %.4f ||' % (loss_l.item()) + ' || Conf Loss: %.4f ||' % (loss_c.item()), end= ' ')
+            print('iter %5d' %(iteration) + ' || Loss: %7.4f ||' % (loss.item())+ 'Loc Loss: %7.4f ||' % (loss_l.item()) + ' || Conf Loss: %7.4f ||' % (loss_c.item()),  end= ' ')
+            print('timer: %.4f sec.' % (t1 - t0))
         if args.visdom:
-            update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
-                            iter_plot, epoch_plot, 'append')
+            update_vis_plot(iteration, loss_l.item(), loss_c.item(), iter_plot, epoch_plot, 'append')
 
         if iteration != 0 and iteration % 5000 == 0:
             print('Saving state, iter:', iteration)
@@ -215,7 +263,7 @@ def adjust_learning_rate(optimizer, gamma, step):
 
 
 def xavier(param):
-    init.xavier_uniform(param)
+    init.xavier_uniform_(param)
 
 
 def weights_init(m):
